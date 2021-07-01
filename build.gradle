@@ -1,0 +1,100 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2021 Evren Coşkun
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    ext.android_gradle_plugin_version = '4.1.1'
+    ext.androidx_annotation_version = '1.1.0'
+    ext.androidx_appcompat_version = '1.2.0'
+    ext.androidx_core_version = '1.3.2'
+    ext.androidx_fragment_version = '1.2.5'
+    ext.androidx_recyclerview_version = '1.1.0'
+    ext.compile_sdk_version = 29
+    ext.java_version = '1.8'
+    ext.min_sdk_version = 14
+    ext.target_sdk_version = 29
+
+    repositories {
+        jcenter()
+        google()
+    }
+
+    dependencies {
+        classpath "com.android.tools.build:gradle:$android_gradle_plugin_version"
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+allprojects {
+    repositories {
+        jcenter()
+        google()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+
+subprojects {
+    if (project.getGradle().startParameter.taskNames.any{it.contains('bintrayUpload')} && project.name in ['tableview']) {
+        println project.name
+        apply plugin: 'maven'
+
+        gradle.taskGraph.whenReady { taskGraph ->
+            def pomTask = taskGraph.getAllTasks().find {
+                it.path == ":$project.name:generatePomFileForReleasePublication"
+            }
+            if (pomTask == null) println 'pomTask null'
+            if (pomTask == null) return
+            pomTask.doLast {
+                println 'Updating pom-file(s) with License info'
+                pomTask.outputs.files
+                        .filter { File file ->
+                            file.path.contains("publications") && file.name.matches("^pom-.+\\.xml\$")
+                        }
+                        .forEach { File file -> addLicense(file) }
+            }
+        }
+    }
+}
+
+static void addLicense(File pom) {
+    def licenseNode = new Node(null, "license")
+    licenseNode.append(new Node(null, "name", "MIT"))
+    licenseNode.append(new Node(null, "url", "https://github.com/evrencoskun/TableView/blob/master/LICENSE"))
+    def licensesNode = new Node(null, "licenses")
+    licensesNode.append(licenseNode)
+
+    def xml = new XmlParser().parse(pom)
+    xml.append(licensesNode)
+
+    def writer = new PrintWriter(new FileWriter(pom))
+    def printer = new XmlNodePrinter(writer)
+    printer.preserveWhitespace = true
+    printer.print(xml)
+    writer.close()
+}
